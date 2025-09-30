@@ -19,7 +19,7 @@ st.sidebar.header("Filters")
 countries = st.sidebar.multiselect(
     "Select Countries",
     options=df['Country/Region'].unique(),
-    default=["India", "US", "Brazil"]
+    default=["India", "US", "France"]
 )
 
 if countries:
