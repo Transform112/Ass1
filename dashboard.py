@@ -13,9 +13,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS for better styling and black font fix
 st.markdown("""
 <style>
+    /* Fix: Set main text color to black (or a dark shade) */
+    .stApp, .main, body {
+        color: #000000; /* Black font color */
+    }
+    
     .main-header {
         font-size: 3rem;
         color: #1f77b4;
@@ -34,6 +39,7 @@ st.markdown("""
         border-radius: 0.5rem;
         border-left: 5px solid #1f77b4;
         margin: 1rem 0;
+        color: #000000; /* Ensure text inside the box is also black */
     }
     .metric-box {
         text-align: center;
@@ -46,23 +52,42 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
-    """Load and preprocess COVID-19 data"""
-    # NOTE: Assuming 'country_wise_latest.csv' is available. 
+    """Load and preprocess COVID-19 data with column name checks/fixes"""
     try:
         df = pd.read_csv("country_wise_latest.csv")
     except FileNotFoundError:
         st.error("Error: 'country_wise_latest.csv' not found. Please ensure the data file is in the same directory.")
         st.stop()
+        return pd.DataFrame() 
+
+    # --- Start Column Fix for common KeyErrors ---
+    column_rename_map = {
+        'Deaths / 100 Cases': 'Deaths per 100 Cases',
+        'Recovered / 100 Cases': 'Recovered per 100 Cases',
+        'Deaths per 100 cases': 'Deaths per 100 Cases',
+        'Recovered per 100 cases': 'Recovered per 100 Cases',
+        'Deaths-per-100-Cases': 'Deaths per 100 Cases',
+        'Recovered-per-100-Cases': 'Recovered per 100 Cases',
+    }
+    
+    for old_name, new_name in column_rename_map.items():
+        if old_name in df.columns and new_name not in df.columns:
+            df.rename(columns={old_name: new_name}, inplace=True)
+    # --- End Column Fix ---
 
     # Add calculated fields for better analysis
     df['Mortality_Rate'] = (df['Deaths'] / df['Confirmed'] * 100).round(2).fillna(0)
     df['Recovery_Rate'] = (df['Recovered'] / df['Confirmed'] * 100).round(2).fillna(0)
     df['Active_Rate'] = (df['Active'] / df['Confirmed'] * 100).round(2).fillna(0)
         
-    # Handle potential division by zero for countries with 0 confirmed cases
     df.loc[df['Confirmed'] == 0, ['Mortality_Rate', 'Recovery_Rate', 'Active_Rate']] = 0
 
-    # Fill NaNs for the original rate columns as well
+    if 'Deaths per 100 Cases' not in df.columns:
+        df['Deaths per 100 Cases'] = df['Mortality_Rate'] 
+    
+    if 'Recovered per 100 Cases' not in df.columns:
+        df['Recovered per 100 Cases'] = df['Recovery_Rate'] 
+
     df['Deaths per 100 Cases'] = df['Deaths per 100 Cases'].fillna(0)
     df['Recovered per 100 Cases'] = df['Recovered per 100 Cases'].fillna(0)
 
@@ -93,7 +118,6 @@ def create_advanced_visualizations(df, filtered_df, countries):
 
     col1, col2 = st.columns(2)
 
-    # Combine rate metrics into one DataFrame for easier plotting with Seaborn
     rate_metrics = filtered_df[['Country/Region', 'Mortality_Rate', 'Recovery_Rate', 'Active_Rate']]
     rate_df_melted = rate_metrics.melt(id_vars='Country/Region', 
                                      var_name='Rate Type', 
@@ -117,7 +141,6 @@ def create_advanced_visualizations(df, filtered_df, countries):
     with col2:
         fig_box2, ax_box2 = plt.subplots(figsize=(8, 6))
 
-        # Box plot for global top 20 countries by confirmed cases
         top_20 = df.nlargest(20, 'Confirmed')
         top_20_melted = top_20[['Mortality_Rate', 'Recovery_Rate']].melt(var_name='Rate Type', value_name='Rate Value (%)')
 
@@ -137,14 +160,11 @@ def create_advanced_visualizations(df, filtered_df, countries):
     st.markdown("### Relationship Analysis with Pair Plot")
     st.markdown("**Exploring Correlations**: This matrix shows relationships between different COVID-19 metrics, revealing patterns and correlations in the selected countries.")
 
-    # Create pair plot data - ensure to use the filtered_df
     pair_plot_data = filtered_df[['Country/Region', 'Confirmed', 'Deaths', 'Recovered', 'Mortality_Rate']].copy()
-    # Use log scale for heavy-tailed count data for better visualization
     pair_plot_data['log_Confirmed'] = np.log1p(pair_plot_data['Confirmed'])
     pair_plot_data['log_Deaths'] = np.log1p(pair_plot_data['Deaths'])
     pair_plot_data['log_Recovered'] = np.log1p(pair_plot_data['Recovered'])
 
-    # Using Seaborn for a cleaner, more robust pair plot
     fig_pair = sns.pairplot(
         pair_plot_data, 
         vars=['log_Confirmed', 'log_Deaths', 'log_Recovered'], 
@@ -156,7 +176,6 @@ def create_advanced_visualizations(df, filtered_df, countries):
     
     fig_pair.fig.suptitle('Log-Scaled COVID-19 Metrics Relationship Matrix (Color by Mortality Rate)', fontsize=16, y=1.02)
     
-    # Relabel axes to reflect log scale
     new_labels = ['log(Confirmed)', 'log(Deaths)', 'log(Recovered)']
     for i, ax in enumerate(fig_pair.axes.flat):
         ax.set_xlabel(new_labels[i % 3] if i >= 3 else "")
@@ -175,7 +194,6 @@ def create_advanced_visualizations(df, filtered_df, countries):
                          'Mortality_Rate', 'Recovery_Rate', 'Deaths per 100 Cases']
 
     with col1:
-        # Correlation heatmap for selected countries
         fig_heat1, ax_heat1 = plt.subplots(figsize=(10, 8))
 
         corr_matrix = filtered_df[correlation_metrics].corr()
@@ -188,7 +206,6 @@ def create_advanced_visualizations(df, filtered_df, countries):
         st.pyplot(fig_heat1)
 
     with col2:
-        # Global correlation heatmap (top 30 countries)
         fig_heat2, ax_heat2 = plt.subplots(figsize=(10, 8))
 
         top_30_global = df.nlargest(30, 'Confirmed')
@@ -200,11 +217,10 @@ def create_advanced_visualizations(df, filtered_df, countries):
 
         st.pyplot(fig_heat2)
 
-    # Individual Country Rate Comparison (Replaced problematic Violin Plot)
+    # Individual Country Rate Comparison
     st.markdown("### Individual Country Rate Comparison")
     st.markdown("**Direct Comparison**: This visualization clearly plots the different rate metrics for each selected country, enabling direct comparison.")
 
-    # Reformat data for the plot
     individual_rate_df = filtered_df[['Country/Region', 'Mortality_Rate', 'Recovery_Rate', 'Active_Rate']].melt(
         id_vars='Country/Region', 
         var_name='Metric', 
@@ -240,7 +256,6 @@ def create_comparative_analysis(df, filtered_df, countries):
         st.markdown("### Country Performance Comparison Table")
         st.markdown("**Benchmarking Performance**: Compare selected countries across multiple dimensions to understand relative performance and outcomes.")
 
-        # Create comparison metrics
         comparison_metrics = []
         for country in countries:
             country_data = df[df['Country/Region'] == country]
@@ -265,14 +280,12 @@ def create_comparative_analysis(df, filtered_df, countries):
 
         fig_radar, ax_radar = plt.subplots(figsize=(10, 10), subplot_kw=dict(projection='polar'))
 
-        # Prepare radar chart data
         radar_metrics = ['Mortality_Rate', 'Recovery_Rate', 'Active_Rate']
         angles = np.linspace(0, 2 * np.pi, len(radar_metrics), endpoint=False).tolist()
-        angles += angles[:1]  # Complete the circle
+        angles += angles[:1] 
 
         colors = plt.cm.Set3(np.linspace(0, 1, len(countries)))
 
-        # Normalize data for effective radar chart comparison (Min-Max Scaling)
         radar_df = filtered_df[radar_metrics].copy()
         
         for metric in radar_metrics:
@@ -283,28 +296,26 @@ def create_comparative_analysis(df, filtered_df, countries):
             else:
                 radar_df[metric] = 0.5 
         
-        # Invert Mortailty_Rate and Active_Rate (higher is worse) for consistent interpretation (higher score = better performance)
+        # Invert (higher is worse) for consistent interpretation (higher score = better performance)
         radar_df['Mortality_Rate'] = 1 - radar_df['Mortality_Rate']
         radar_df['Active_Rate'] = 1 - radar_df['Active_Rate']
 
-        # Ensure country names align with the filtered_df index
         country_list = filtered_df['Country/Region'].tolist() 
         
         for i, country in enumerate(country_list):
             country_data = radar_df.iloc[i] 
             values = [country_data[metric] for metric in radar_metrics]
-            values += values[:1]  # Complete the circle
+            values += values[:1] 
 
             ax_radar.plot(angles, values, 'o-', linewidth=2, label=country, color=colors[i])
             ax_radar.fill(angles, values, alpha=0.25, color=colors[i])
 
         ax_radar.set_xticks(angles[:-1])
-        # Adjust labels for normalized and inverted data
         display_metrics = ['Recovery Rate (Normalized)', 'Mortality Rate (Inverted Normalized)', 'Active Rate (Inverted Normalized)']
         ax_radar.set_xticklabels(display_metrics, fontsize=9)
         ax_radar.set_title('Normalized Country Performance Radar Chart', pad=20)
         ax_radar.set_rlabel_position(0)
-        ax_radar.set_yticks(np.linspace(0, 1, 6)) # Show normalized scale
+        ax_radar.set_yticks(np.linspace(0, 1, 6)) 
         ax_radar.set_yticklabels([f'{val:.1f}' for val in np.linspace(0, 1, 6)], color="grey", size=8)
         ax_radar.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
 
@@ -342,11 +353,10 @@ def main():
 
     show_raw_data = st.sidebar.checkbox("Show Raw Data", value=False)
 
-    # Filter data (Fixed logic here)
+    # Filter data 
     if countries:
         filtered_df = df[df['Country/Region'].isin(countries)]
     else:
-        # If no countries selected, default to top 10 for meaningful visualizations
         filtered_df = df.nlargest(10, 'Confirmed').copy()
         countries = filtered_df['Country/Region'].tolist()
         st.warning(f"No countries selected. Showing top 10 countries by confirmed cases: {', '.join(countries[:5])}...")
@@ -361,7 +371,6 @@ def main():
 
         col1, col2, col3, col4 = st.columns(4)
 
-        # Calculate global metrics (using the full 'df')
         total_confirmed = df['Confirmed'].sum()
         total_deaths = df['Deaths'].sum()
         total_recovered = df['Recovered'].sum()
@@ -424,7 +433,6 @@ def main():
                 ax1.set_title("Confirmed Cases by Country", fontsize=14, fontweight='bold')
                 ax1.set_xlabel("Number of Confirmed Cases")
                 
-                # Add value labels on bars
                 for bar in bars.patches:
                     width = bar.get_width()
                     ax1.text(width + width*0.01, bar.get_y() + bar.get_height()/2, 
@@ -442,7 +450,6 @@ def main():
 
             fig2, ax2 = plt.subplots(figsize=(8, 8))
             
-            # Filter out countries with 0 deaths for the pie chart
             pie_data = filtered_df[filtered_df["Deaths"] > 0].copy()
             
             if not pie_data.empty:
@@ -458,7 +465,6 @@ def main():
                 )
                 ax2.set_title("Deaths Distribution Among Selected Countries", fontsize=14, fontweight='bold')
 
-                # Improve text readability
                 for autotext in autotexts:
                     autotext.set_color('black') 
                     autotext.set_fontweight('bold')
@@ -501,6 +507,7 @@ def main():
         - **Recovery Rate** = (Recovered / Confirmed Cases) × 100  
         - **Active Rate** = (Active Cases / Confirmed Cases) × 100
         - Rates for 0 confirmed cases are set to 0.
+        - **Note on Column Renaming:** The script automatically attempts to correct common column naming issues in the raw data (`Deaths / 100 Cases` or similar) to ensure the application runs smoothly.
 
         **Visualization Techniques**:
         - **Box plots** show quartiles, medians, and outliers of the rates across the selected countries.
