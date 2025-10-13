@@ -13,40 +13,78 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling and black font fix
 st.markdown("""
 <style>
-    /* Fix: Set main text color to black (or a dark shade) */
+    *{
+        color:white;
+    }
+    /* 1. General Typography & Adaptive Font Color */
+    /* Use Streamlit's internal CSS variable (--text-color) for automatic light/dark mode adaptation. */
     .stApp, .main, body {
-        color: #000000; /* Black font color */
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+        /* Ensures text is dark in Light Mode, and white/light in Dark Mode */
+        color: var(--text-color); 
+    }
+
+    /* 2. Main Header Enhancement (Fixed Color for prominence) */
+    .main-header {
+        font-size: 3.2rem;
+        font-weight: 800;
+        color: #1a5a92; /* Deep blue, remains fixed for strong branding */
+        text-align: center;
+        margin-bottom: 2.5rem;
+        padding-top: 1rem;
+        /* Adaptive shadow color for better visibility */
+        text-shadow: 1px 1px 2px var(--secondary-background-color); 
     }
     
-    .main-header {
-        font-size: 3rem;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
+    /* 3. Section Header Enhancement (Fixed Color for clarity) */
     .section-header {
-        font-size: 2rem;
-        color: #ff7f0e;
-        margin-top: 2rem;
+        font-size: 2.2rem;
+        font-weight: 600;
+        color: #d9534f; /* Contrasting red/orange */
+        border-bottom: 2px solid #f0ad4e;
+        padding-bottom: 0.5rem;
+        margin-top: 3rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    /* 4. Insight Box Refinement (REMOVED FIXED LIGHT BACKGROUND) */
+    .insight-box {
+        background-color: transparent; /* Use transparent background for boxes to adapt to the theme */
+        padding: 1.2rem;
+        border-radius: 0.6rem;
+        border: 1px solid var(--secondary-background-color); /* Subtle border for definition */
+        border-left: 6px solid #1a5a92; /* Deep blue highlight border */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); /* Subtle shadow (may need adjustment for pure dark mode) */
+        margin: 1.5rem 0;
+        color: var(--text-color) !important; /* Ensure adaptive color is used */
+    }
+    
+    /* Ensure all text inside the box uses the adaptive theme color */
+    .insight-box, .insight-box * {
+        color: var(--text-color) !important; 
+    }
+    
+    /* Bold text inside the box stands out slightly */
+    .insight-box strong {
+        color: var(--text-color) !important; 
+        font-weight: 700;
+    }
+
+    /* 5. General Text/Subtitle styling */
+    .stMarkdown p {
+        font-size: 1.05rem;
+        line-height: 1.6;
         margin-bottom: 1rem;
     }
-    .insight-box {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 5px solid #1f77b4;
-        margin: 1rem 0;
-        color: #000000; /* Ensure text inside the box is also black */
+
+    /* Optional: Improve table/dataframe styling for Dark Mode */
+    .stDataFrame {
+        color: var(--text-color);
+        background-color: var(--secondary-background-color);
     }
-    .metric-box {
-        text-align: center;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -112,7 +150,7 @@ def create_advanced_visualizations(df, filtered_df, countries):
 
     st.markdown('<div class="section-header">Advanced Analytics</div>', unsafe_allow_html=True)
 
-    # Box Plot Analysis
+    ## Rate Distribution Analysis
     st.markdown("### Rate Distribution Across Selected Countries")
     st.markdown("**Understanding Data Distribution**: This box plot compares the median, quartiles, and range of key rates (Mortality, Recovery, Active) *across all selected countries*.")
 
@@ -124,6 +162,7 @@ def create_advanced_visualizations(df, filtered_df, countries):
                                      value_name='Rate Value (%)')
 
     with col1:
+        # NOTE: Matplotlib/Seaborn plots often require separate styling for dark mode if defaults aren't good.
         fig_box1, ax_box1 = plt.subplots(figsize=(8, 6))
 
         sns.boxplot(x='Rate Type', y='Rate Value (%)', data=rate_df_melted, 
@@ -156,7 +195,7 @@ def create_advanced_visualizations(df, filtered_df, countries):
 
         st.pyplot(fig_box2)
 
-    # Pair Plot Analysis
+    ## Pair Plot Analysis
     st.markdown("### Relationship Analysis with Pair Plot")
     st.markdown("**Exploring Correlations**: This matrix shows relationships between different COVID-19 metrics, revealing patterns and correlations in the selected countries.")
 
@@ -184,7 +223,8 @@ def create_advanced_visualizations(df, filtered_df, countries):
 
     st.pyplot(fig_pair)
 
-    # Enhanced Heatmap Analysis
+
+    ## Enhanced Heatmap Analysis
     st.markdown("### Comprehensive Correlation Heatmap")
     st.markdown("**Deep Correlation Analysis**: This enhanced heatmap includes calculated rates and provides a comprehensive view of how different metrics relate to each other.")
 
@@ -217,7 +257,7 @@ def create_advanced_visualizations(df, filtered_df, countries):
 
         st.pyplot(fig_heat2)
 
-    # Individual Country Rate Comparison
+    ## Individual Country Rate Comparison
     st.markdown("### Individual Country Rate Comparison")
     st.markdown("**Direct Comparison**: This visualization clearly plots the different rate metrics for each selected country, enabling direct comparison.")
 
@@ -274,7 +314,7 @@ def create_comparative_analysis(df, filtered_df, countries):
         comparison_df = pd.DataFrame(comparison_metrics)
         st.table(comparison_df)
 
-        # Radar chart for multi-dimensional comparison
+        ## Multi-Dimensional Performance Radar
         st.markdown("### Multi-Dimensional Performance Radar")
         st.markdown("**Holistic View**: This radar chart provides a comprehensive view of how countries perform across multiple metrics simultaneously.")
 
